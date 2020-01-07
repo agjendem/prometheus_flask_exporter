@@ -5,6 +5,7 @@ import inspect
 import warnings
 import functools
 import threading
+from http import HTTPStatus
 from timeit import default_timer
 
 from flask import request, make_response, current_app
@@ -331,6 +332,11 @@ class PrometheusMetrics(object):
                 if any(pattern.match(request.path) for pattern in self.excluded_paths):
                     return response
 
+            if isinstance(response.status_code, HTTPStatus):
+                status_code = response.status_code.value
+            else:
+                status_code = response.status_code
+
             if hasattr(request, 'prom_start_time'):
                 total_time = max(default_timer() - request.prom_start_time, 0)
 
@@ -340,12 +346,12 @@ class PrometheusMetrics(object):
                     group = getattr(request, duration_group)
 
                 histogram.labels(
-                    request.method, group, response.status_code,
+                    request.method, group, status_code,
                     *map(lambda kv: kv[1], additional_labels)
                 ).observe(total_time)
 
             counter.labels(
-                request.method, response.status_code,
+                request.method, status_code,
                 *map(lambda kv: kv[1], additional_labels)
             ).inc()
 
